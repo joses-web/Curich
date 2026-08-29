@@ -4086,6 +4086,31 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    version: 76,
+    name: 'add_culqi_columns_to_orders',
+    up: () => {
+      const orderColumns = getColumns(db, 'orders');
+      if (!orderColumns.includes('payment_gateway')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN payment_gateway TEXT DEFAULT 'CULQI_POS'`);
+      }
+      if (!orderColumns.includes('culqi_transaction_id')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_transaction_id TEXT`);
+      }
+      if (!orderColumns.includes('culqi_authorization_code')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_authorization_code TEXT`);
+      }
+      if (!orderColumns.includes('culqi_card_brand')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_card_brand TEXT`);
+      }
+      if (!orderColumns.includes('culqi_terminal_id')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_terminal_id TEXT`);
+      }
+      if (!orderColumns.includes('local_reconciliation_status')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN local_reconciliation_status TEXT DEFAULT 'PENDING'`);
+      }
+    },
+  },
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
@@ -4408,6 +4433,12 @@ function createSchema(): void {
       completed_at TEXT,
       cancelled_at TEXT,
       cancellation_reason TEXT,
+      payment_gateway TEXT DEFAULT 'CULQI_POS',
+      culqi_transaction_id TEXT,
+      culqi_authorization_code TEXT,
+      culqi_card_brand TEXT,
+      culqi_terminal_id TEXT,
+      local_reconciliation_status TEXT DEFAULT 'PENDING',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
