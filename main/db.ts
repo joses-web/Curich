@@ -4109,8 +4109,41 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       if (!orderColumns.includes('local_reconciliation_status')) {
         db.exec(`ALTER TABLE orders ADD COLUMN local_reconciliation_status TEXT DEFAULT 'PENDING'`);
       }
-    },
+    }
   },
+  {
+    version: 77,
+    name: 'add_senda_columns_to_orders',
+    up: () => {
+      const orderColumns = getColumns(db, 'orders');
+      if (!orderColumns.includes('invoice_number')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN invoice_number TEXT`);
+      }
+      if (!orderColumns.includes('qr_code_data')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN qr_code_data TEXT`);
+      }
+      if (!orderColumns.includes('senda_status')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN senda_status TEXT DEFAULT 'pending'`);
+      }
+    }
+  },
+
+    {
+    version: 78,
+    name: 'add_sync_queue_table',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sync_queue (
+          id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          payload TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    }
+  }
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
@@ -5164,39 +5197,7 @@ export function projectKdsItem(item: any, restricted: boolean): any {
       return safeAddon;
     });
 
-  MIGRATIONS.push({
-    version: 77,
-    name: 'add_senda_columns_to_orders',
-    up: () => {
-      const orderColumns = getColumns(db, 'orders');
-      if (!orderColumns.includes('invoice_number')) {
-        db.exec(`ALTER TABLE orders ADD COLUMN invoice_number TEXT`);
-      }
-      if (!orderColumns.includes('qr_code_data')) {
-        db.exec(`ALTER TABLE orders ADD COLUMN qr_code_data TEXT`);
-      }
-      if (!orderColumns.includes('senda_status')) {
-        db.exec(`ALTER TABLE orders ADD COLUMN senda_status TEXT DEFAULT 'pending'`);
-      }
-    }
-  });
 
-  MIGRATIONS.push({
-    version: 78,
-    name: 'add_sync_queue_table',
-    up: () => {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS sync_queue (
-          id TEXT PRIMARY KEY,
-          order_id TEXT NOT NULL,
-          type TEXT NOT NULL,
-          status TEXT DEFAULT 'pending',
-          payload TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-    }
-  });
 
   }
   return projected;

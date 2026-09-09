@@ -26,13 +26,13 @@ export class ErpSyncService {
   }
 
   private static async processQueue() {
-    const db = getDatabase();
-
-    // Check if table exists (may not exist during early init)
+    let db;
     try {
-        db.prepare('SELECT 1 FROM sync_queue LIMIT 1').get();
+      db = getDatabase();
+      if (!db) return;
+      db.prepare('SELECT 1 FROM sync_queue LIMIT 1').get();
     } catch (e) {
-        return;
+      return;
     }
 
     const pendingItems = db.prepare(`SELECT * FROM sync_queue WHERE status = 'pending' LIMIT 10`).all() as any[];

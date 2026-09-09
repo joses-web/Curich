@@ -3,7 +3,7 @@ import { getDatabase } from '../db';
 import { randomUUID } from 'crypto';
 
 export class SendaService {
-  private static readonly API_URL = 'https://api.senda.pe/v1';
+  private static readonly API_URL = 'https://int.sendaefact.pe/webservice';
 
   private static getToken(): string {
     const token = process.env.SENDA_TOKEN;
@@ -18,8 +18,14 @@ export class SendaService {
 
     try {
       const response = await axios.post(
-        `${this.API_URL}/comprobantes`,
-        orderData,
+        `${this.API_URL}/emitir`,
+        {
+          cabecera: {
+            idDocumento: orderData.id,
+            total: orderData.total
+          },
+          items: []
+        },
         {
           headers: {
             'Authorization': `Bearer ${this.getToken()}`,
@@ -31,11 +37,11 @@ export class SendaService {
       const invoiceNumber = response.data.invoice_number || 'UNKNOWN';
       const qrCodeData = response.data.qr_code_data || '';
 
-      db.exec(`UPDATE orders SET invoice_number = '${invoiceNumber}', qr_code_data = '${qrCodeData}', senda_status = 'emitted' WHERE id = '${orderId}'`);
+      db.prepare(`UPDATE orders SET invoice_number = ?, qr_code_data = ?, senda_status = 'emitted' WHERE id = ?`).run(invoiceNumber, qrCodeData, orderId);
 
     } catch (error: any) {
       console.error('Failed to emit receipt via Senda:', error.message);
-      db.exec(`UPDATE orders SET senda_status = 'error' WHERE id = '${orderId}'`);
+      db.prepare(`UPDATE orders SET senda_status = 'error' WHERE id = ?`).run(orderId);
       throw error;
     }
   }
@@ -51,8 +57,10 @@ export class SendaService {
       }
 
       await axios.post(
-        `${this.API_URL}/comprobantes/${order.invoice_number}/anular`,
-        {},
+        `${this.API_URL}/anular`,
+        {
+          idDocumento: order.invoice_number
+        },
         {
           headers: {
             'Authorization': `Bearer ${this.getToken()}`,
@@ -61,7 +69,7 @@ export class SendaService {
         }
       );
 
-      db.exec(`UPDATE orders SET senda_status = 'cancelled' WHERE id = '${orderId}'`);
+      db.prepare(`UPDATE orders SET senda_status = 'cancelled' WHERE id = ?`).run(orderId);
     } catch (error: any) {
       console.error('Failed to cancel receipt via Senda:', error.message);
       throw error;
