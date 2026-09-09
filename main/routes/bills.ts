@@ -1,3 +1,5 @@
+import { SendaService } from '../services/senda.service';
+import { ErpSyncService } from '../services/erp-sync';
 import { createHash, randomUUID } from 'crypto';
 import { Router, Request, Response } from 'express';
 import {
@@ -1895,6 +1897,16 @@ function applyPaymentBatch(
   if (paymentStatus === 'paid') {
     const unpaidSibling = db.prepare(`SELECT 1 FROM bills WHERE order_id = ? AND id != ? AND payment_status != 'paid' LIMIT 1`).get(bill.order_id, bill.id);
     const orderFullyPaid = !unpaidSibling;
+
+    if (orderFullyPaid) {
+      try {
+        ErpSyncService.queueSync(bill.order_id, 'sale', bill);
+        SendaService.emitirComprobante(bill.order_id, bill).catch(err => {
+          console.error('Failed to emit senda via bills:', err);
+        });
+      } catch(e) { console.error('ERP queue error', e); }
+    }
+
     if (orderFullyPaid) {
       db.prepare("UPDATE orders SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?").run(changedAt, changedAt, bill.order_id);
       const order = db.prepare('SELECT table_id FROM orders WHERE id = ?').get(bill.order_id) as any;

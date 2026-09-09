@@ -1,3 +1,5 @@
+import { SendaService } from '../services/senda.service';
+import { ErpSyncService } from '../services/erp-sync';
 import { createHash } from 'crypto';
 import { Router, Request, Response } from 'express';
 import { getDatabase, generateOrderNumber, now, parseItemJson, parseRowJson, withTxn, verifyPin, getSettingValue, insertOrderItemAddons, attachEffectiveAddons, utcDayBounds, utcTodayDate } from '../db';
@@ -1023,6 +1025,14 @@ router.patch('/:id/status', orderWriteRateLimit, requireRole(...ROLE_ACCESS.orde
 
           db.prepare('UPDATE orders SET status = ?, cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?')
             .run(status, nowStr, reason, nowStr, req.params.id);
+
+          try {
+            SendaService.anularComprobante(req.params.id as string).catch(err => {
+              console.error('Failed to anular senda:', err);
+            });
+            ErpSyncService.queueSync(req.params.id as string, 'cancellation', { orderId: req.params.id });
+          } catch(e) { console.error('ERP cancel queue error', e); }
+
           // Only free table if explicitly requested (default: true for backward compatibility)
           if (currentOrder.table_id && free_table !== false) {
             db.prepare("UPDATE tables SET status = 'available', updated_at = ? WHERE id = ?")

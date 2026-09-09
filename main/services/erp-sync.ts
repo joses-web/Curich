@@ -2,51 +2,54 @@ import axios from 'axios';
 import { getDatabase } from '../db';
 
 export class ErpSyncService {
-  private static readonly API_URL = 'http://localhost:3000/api/ventas/sync'; // Dummy local endpoint for the ERP as per instruction (or to our real endpoint if configured)
+  private static readonly ERP_API_URL = process.env.ERP_API_URL || 'https://erp.example.com/api/v1';
 
-  public static async processSyncQueue(): Promise<void> {
+  static queueSync(orderId: string, type: 'sale' | 'cancellation', payload: any) {
     const db = getDatabase();
-
-    // Pick pending jobs
-    const queue = db.prepare('SELECT * FROM sync_queue WHERE status = "pending"').all() as any[];
-
-    for (const job of queue) {
-      try {
-        const orderId = job.order_id;
-        const type = job.type;
-
-        const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId) as any[];
-
-        const payload = {
-          order_id: orderId,
-          type: type, // 'pago' | 'anulacion'
-          items: items.map(item => ({
-             product_id: item.product_id,
-             product_name: item.product_name,
-             quantity: item.quantity
-          }))
-        };
-
-        const res = await axios.post(this.API_URL, payload);
-
-        if (res.status === 200 || res.status === 201) {
-          db.prepare('UPDATE sync_queue SET status = "completed" WHERE id = ?').run(job.id);
-        } else {
-          db.prepare('UPDATE sync_queue SET status = "failed" WHERE id = ?').run(job.id);
-        }
-      } catch (err: any) {
-         console.error('ERP Sync Background Error:', err.message);
-         // Keep pending if offline or failed
-      }
-    }
+    const stmt = db.prepare(`
+      INSERT INTO sync_queue (id, order_id, type, status, payload)
+      VALUES (?, ?, ?, 'pending', ?)
+    `);
+    stmt.run(
+      Math.random().toString(36).substring(7),
+      orderId,
+      type,
+      JSON.stringify(payload)
+    );
   }
 
-  public static startWorker(): void {
-    // Run every minute
-    setInterval(() => {
-       this.processSyncQueue();
-    }, 60000);
-    // Initial run
-    this.processSyncQueue();
+  static async startWorker() {
+    console.log('Starting ERP Sync Worker...');
+    setInterval(async () => {
+      await this.processQueue();
+    }, 10000); // Poll every 10 seconds
+  }
+
+  private static async processQueue() {
+    const db = getDatabase();
+
+    // Check if table exists (may not exist during early init)
+    try {
+        db.prepare('SELECT 1 FROM sync_queue LIMIT 1').get();
+    } catch (e) {
+        return;
+    }
+
+    const pendingItems = db.prepare(`SELECT * FROM sync_queue WHERE status = 'pending' LIMIT 10`).all() as any[];
+
+    for (const item of pendingItems) {
+      try {
+        await axios.post(`${this.ERP_API_URL}/sync`, {
+          orderId: item.order_id,
+          type: item.type,
+          payload: JSON.parse(item.payload)
+        });
+
+        db.prepare(`UPDATE sync_queue SET status = 'completed' WHERE id = ?`).run(item.id);
+      } catch (error: any) {
+        console.error(`ERP Sync Failed for item ${item.id}:`, error.message);
+        // Optionally update status to 'error' and implement retry logic
+      }
+    }
   }
 }
