@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getDatabase } from '../db';
+import { getDatabase, getNextSequence } from '../db';
 import { randomUUID } from 'crypto';
 
 // Helper to convert number to words in Spanish
@@ -84,22 +84,16 @@ export class SendaService {
       const nro_serie_efact = isInvoice ? 'F122' : 'B121';
 
 
-      const seqKey = `senda_efact_${nro_serie_efact}`;
-      const seqQuery = db.prepare('UPDATE sequences SET value = value + 1 WHERE key = ? RETURNING value');
-      let seqRes = seqQuery.get(seqKey) as any;
-      if (!seqRes) {
-        db.prepare('INSERT INTO sequences (key, value) VALUES (?, 1)').run(seqKey);
-        seqRes = { value: 1 };
-      }
-      const numero = seqRes.value.toString().padStart(6, '0');
+      const seqValue = getNextSequence(`senda_${nro_serie_efact}`, 'ALL');
+      const numero = seqValue.toString().padStart(6, '0');
 
 
 
-      const ruc_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'tenant_tax_registration_number'").get() as any)?.value || '20610414983';
-      const razonsocial_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'tenant_name'").get() as any)?.value || 'CAVAS REUNIDAS PERU S.A';
-      const direccion_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'tenant_address'").get() as any)?.value || '';
-      const telefono_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'tenant_phone'").get() as any)?.value || '';
-      const email_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'tenant_email'").get() as any)?.value || '';
+      const ruc_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'tax_registration_number'").get() as any)?.value || '20610414983';
+      const razonsocial_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'business_name'").get() as any)?.value || 'CAVAS REUNIDAS PERU S.A';
+      const direccion_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'business_address'").get() as any)?.value || '';
+      const telefono_emisor = (db.prepare("SELECT value FROM settings WHERE key = 'business_phone'").get() as any)?.value || '';
+      const email_emisor = '';
 
       const op_gravada = Number(orderData.subtotal || 0).toFixed(2);
       const igv = Number(orderData.tax_amount || 0).toFixed(2);

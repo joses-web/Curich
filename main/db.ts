@@ -4964,7 +4964,7 @@ export function generateShortId(table: string, length = 6): string {
 }
 
 /** Atomically get the next sequence value for a given name and date. */
-function getNextSequence(name: string, date: string): number {
+export function getNextSequence(name: string, date: string): number {
   return db.transaction(() => {
     // Try to update existing row
     const updated = db.prepare(`
