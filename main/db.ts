@@ -4086,6 +4086,64 @@ export const MIGRATIONS: { version: number; name: string; up: () => void }[] = [
       }
     },
   },
+  {
+    version: 76,
+    name: 'add_culqi_columns_to_orders',
+    up: () => {
+      const orderColumns = getColumns(db, 'orders');
+      if (!orderColumns.includes('payment_gateway')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN payment_gateway TEXT DEFAULT 'CULQI_POS'`);
+      }
+      if (!orderColumns.includes('culqi_transaction_id')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_transaction_id TEXT`);
+      }
+      if (!orderColumns.includes('culqi_authorization_code')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_authorization_code TEXT`);
+      }
+      if (!orderColumns.includes('culqi_card_brand')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_card_brand TEXT`);
+      }
+      if (!orderColumns.includes('culqi_terminal_id')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN culqi_terminal_id TEXT`);
+      }
+      if (!orderColumns.includes('local_reconciliation_status')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN local_reconciliation_status TEXT DEFAULT 'PENDING'`);
+      }
+    }
+  },
+  {
+    version: 77,
+    name: 'add_senda_columns_to_orders',
+    up: () => {
+      const orderColumns = getColumns(db, 'orders');
+      if (!orderColumns.includes('invoice_number')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN invoice_number TEXT`);
+      }
+      if (!orderColumns.includes('qr_code_data')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN qr_code_data TEXT`);
+      }
+      if (!orderColumns.includes('senda_status')) {
+        db.exec(`ALTER TABLE orders ADD COLUMN senda_status TEXT DEFAULT 'pending'`);
+      }
+    }
+  },
+
+    {
+    version: 78,
+    name: 'add_sync_queue_table',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sync_queue (
+          id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          payload TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    }
+  }
 ];
 
 function syncBackupBeforeMigration(fromVersion: number, toVersion: number): void {
@@ -4408,6 +4466,12 @@ function createSchema(): void {
       completed_at TEXT,
       cancelled_at TEXT,
       cancellation_reason TEXT,
+      payment_gateway TEXT DEFAULT 'CULQI_POS',
+      culqi_transaction_id TEXT,
+      culqi_authorization_code TEXT,
+      culqi_card_brand TEXT,
+      culqi_terminal_id TEXT,
+      local_reconciliation_status TEXT DEFAULT 'PENDING',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -4900,7 +4964,7 @@ export function generateShortId(table: string, length = 6): string {
 }
 
 /** Atomically get the next sequence value for a given name and date. */
-function getNextSequence(name: string, date: string): number {
+export function getNextSequence(name: string, date: string): number {
   return db.transaction(() => {
     // Try to update existing row
     const updated = db.prepare(`
@@ -5132,6 +5196,9 @@ export function projectKdsItem(item: any, restricted: boolean): any {
       }
       return safeAddon;
     });
+
+
+
   }
   return projected;
 }

@@ -1,3 +1,4 @@
+import { ErpSyncService } from './services/erp-sync';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
@@ -302,6 +303,7 @@ export function startServer(): Promise<void> {
           const websocketServer = new WebSocketServer({ noServer: true });
           wss = websocketServer;
           setupKdsWebSocket(websocketServer);
+          ErpSyncService.startWorker();
 
           listeningServer.on('upgrade', (request, socket, head) => {
             const pathname = (request.url || '').split('?')[0];
