@@ -1357,7 +1357,7 @@ export default function OrdersPage() {
                         {convertingOrderId === order.id ? tOrders('converting') : tOrders('convertToTakeaway')}
                       </Button>
                     )}
-                    {!['completed', 'cancelled'].includes(order.status) && (
+                                        {(!['completed', 'cancelled'].includes(order.status) || order.status === 'completed') && (
                       <Button
                         variant="outline"
                         onClick={() => setCancelModal({ order, reason: '', freeTable: true, overridePin: '' })}

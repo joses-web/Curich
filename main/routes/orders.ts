@@ -931,7 +931,7 @@ router.patch('/:id/status', orderWriteRateLimit, requireRole(...ROLE_ACCESS.orde
         preparing: ['ready', 'served', 'completed', 'cancelled'],
         ready: ['served', 'completed', 'cancelled'],
         served: ['completed', 'cancelled'],
-        completed: [],
+        completed: ['cancelled'],
         cancelled: [],
       };
 
