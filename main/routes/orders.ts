@@ -1010,11 +1010,14 @@ router.patch('/:id/status', orderWriteRateLimit, requireRole(...ROLE_ACCESS.orde
             WHERE order_id = ? AND status NOT IN ('cancelled', 'voided', 'void_adjustment')
           `).all(req.params.id) as any[];
 
-          for (const item of eligibleItems) {
-            const product = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as any;
-            if (product && item.inventory_deducted_quantity > 0) {
-              db.prepare('UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?')
-                .run(item.inventory_deducted_quantity, nowStr, product.id);
+          // Only restock if the order was not already completed (meaning food wasn't consumed)
+          if (currentOrder.status !== 'completed') {
+            for (const item of eligibleItems) {
+              const product = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as any;
+              if (product && item.inventory_deducted_quantity > 0) {
+                db.prepare('UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?')
+                  .run(item.inventory_deducted_quantity, nowStr, product.id);
+              }
             }
           }
 
